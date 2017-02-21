@@ -20,23 +20,24 @@ object WordSubject {
   def main(args: Array[String]): Unit = {
     val dt = args(0)
     val thres = args(1).toDouble
-    val outDt = dt + (thres * 10).toLong.toString
+    val outDt = args(2)
     val selectSQL = s"select id, vec from ${srcTable} where " +
-      s"stat_date=${dt} limit 50"
+      s"stat_date=${dt}"
     val docVecRDD = sparkEnv.hiveContext.sql(selectSQL).map(r => {
       val id = r.getAs[String](0).replaceAll(",", "|")
       val vec = r.getAs[String](1).split(",").map(r => (r.toDouble * 1000000).toInt / 1000000.0)
       (id, vec)
-    }).cache()
+    })
+    docVecRDD.cache()
 
-    var simRDD = cosineSim(docVecRDD,thres).cache()
-    docVecRDD.unpersist()
-    println("simRDD count:"+ simRDD.count())
+    var simRDD = cosineSim(docVecRDD,thres)
+    //println("simRDD count:"+ simRDD.count())
 
+    /*
     for(i <- 0 until 3){
-      simRDD = cosineSim(simRDD,thres).cache()
+      simRDD = cosineSim(simRDD,thres)
     }
-
+    */
 
 
     val trDF = {
@@ -56,7 +57,7 @@ object WordSubject {
     println(docVecArr.length)
     //docVecArr.foreach(r=>println(r._1))
     val brDocVecArr = sparkEnv.sc.broadcast(docVecArr)
-    val simRDD  = docVecRDD.flatMap(r => {
+    val simRDD  = docVecRDD.repartition(320).flatMap(r => {
       val id = r._1
       val docArr = brDocVecArr.value.filter(_._1 > id)
       var flag = true
@@ -79,20 +80,14 @@ object WordSubject {
         val mvec = tmpvec.map(w => (w * 1000000 / sum).toInt / 1000000.0).toArray
         Array(r, (mid, mvec))
       }
-    }).cache()
+    })
 
+    simRDD.cache()
     val filtedArr = simRDD.map(_._1).filter(_.split(",").length>1).
       collect().map(r=>{
       r.split(",")
     })
 
-
-    println("*\n"*30)
-    println("simRDD count:" + simRDD.count())
-    simRDD.collect().foreach(r=>println(r._1))
-
-    println("filtedArr length:" + filtedArr.length)
-    filtedArr.foreach(r=>println(r.mkString(",")))
     val docMap = new mutable.HashMap[String,Int]()
 
     val fArr = filtedArr.filter(r=>{
@@ -111,12 +106,6 @@ object WordSubject {
 
     val deleteSingDocArr = fArr.flatten
 
-    println("fArr length:" + fArr.length)
-    fArr.foreach(r=>println(r.mkString(",")))
-    println("deleteSingDocArr length:" + deleteSingDocArr.length)
-    deleteSingDocArr.foreach(println)
-    println("docMap.size:" + docMap.size)
-
     simRDD.filter(r=>{
       mergeArr.contains(r._1) ||
         (r._1.split(",").length == 1 && (!deleteSingDocArr.contains(r._1)))
@@ -124,29 +113,4 @@ object WordSubject {
       (r._1.replaceAll(",","|"),r._2)
     })
   }
-
-
-      /*if(!flag) (0,r._1,r._2)
-      else{
-        i = 0
-        while (flag && i < bigDocArr.length) {
-          val w = bigDocArr(i)
-          val sim = (0 until r._2.length).map(x => w._2(x) * r._2(x)).sum
-          if (sim > thres) {
-            res = w
-            flag = false
-          }
-        }
-        if (flag) (1, r._1, r._2)
-        else {
-          val mid = id + "," + res._1
-          val tmpvec = (0 until r._2.length).map(x => r._2(x) + res._2(x))
-          val sum = math.sqrt(tmpvec.map(x => x * x).sum)
-          val mvec = tmpvec.map(w => (w * 1000000 / sum).toInt / 1000000.0).toArray
-          (1,mid, mvec)
-        }
-      }
-      */
-
-
 }
