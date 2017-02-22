@@ -12,7 +12,7 @@ import org.apache.spark.sql.SQLContext
 import scala.collection.mutable
 
 object WordSubject {
-  val srcTable = "algo.dxp_label_docvec"
+  val srcTable = "algo.dxp_label_subject_words_new"
   val desTable = "algo.dxp_label_subject_words_new"
 
   val sparkEnv = new SparkEnv("WordSubject")
