@@ -32,7 +32,8 @@ object TextRank {
 
   def main(args: Array[String]): Unit = {
     val dt = args(0)
-    val selectSQL = s"select words,vecString from from ${srcTable} where stat_date=${dt}"
+    val out_dt = args(1)
+    val selectSQL = s"select words from ${srcTable} where stat_date=${dt}"
     val wordsDF = sparkEnv.hiveContext.sql(selectSQL)
 
     val max_iter = 20
@@ -41,7 +42,7 @@ object TextRank {
     val d = 0.85
 
     //对每篇文章进行TextRank计算，最后进行相同项合并
-    val trRDD:RDD[(String,Double)] = wordsDF.map(l=>{
+    val trRDD:RDD[(String,Double)] = wordsDF.repartition(200).map(l=>{
       val wordsArr = l.getAs[String](0).split(",")
       val words = new mutable.HashMap[String,Set[String]]()
       //取得每个词在指定窗口下词集合
@@ -82,7 +83,7 @@ object TextRank {
         })
         score = m
       }
-      score.toArray
+      score.toArray.sortWith(_._2 > _._2).take((score.size*0.8).toInt)
     }).flatMap(r=>r)
 
     val trDF = {
@@ -91,6 +92,6 @@ object TextRank {
       import sqlContext.implicits._
       trRDD.reduceByKey(_ + _).toDF("word","trval")
     }
-    DXPUtils.saveDataFrame(trDF,desTable,dt,sparkEnv.hiveContext)
+    DXPUtils.saveDataFrame(trDF,desTable,out_dt,sparkEnv.hiveContext)
   }
 }

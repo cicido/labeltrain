@@ -17,8 +17,9 @@ object GetWordVector {
 
   def main(args: Array[String]): Unit = {
     val dt = args(0)
-    val minCount = args(1).toInt
-    val selectSQL = s"select words from $srcTable"
+    val out_dt = args(1)
+    val minCount = args(2).toInt
+    val selectSQL = s"select words from $srcTable where stat_date=${dt}"
     val segDF = sparkEnv.hiveContext.sql(selectSQL)
 
     val segRDD = segDF.map(_.getAs[String](0).split(",").toSeq)
@@ -42,12 +43,12 @@ object GetWordVector {
       w.toArray.mkString(",")
     }}
 
-    val wordResDF = wordVecDF.
+    val wordResDF = wordVecDF.repartition(200).
       withColumn("vecString",vecToString(wordVecDF("vector"))).
       select("word","vecString")
     wordResDF.printSchema()
 
-    DXPUtils.saveDataFrame(wordResDF, dstTable,dt,sparkEnv.hiveContext)
+    DXPUtils.saveDataFrame(wordResDF, dstTable,out_dt,sparkEnv.hiveContext)
 
 
     /*

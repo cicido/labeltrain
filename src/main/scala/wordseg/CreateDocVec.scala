@@ -16,6 +16,7 @@ object CreateDocVec {
 
   def main(args: Array[String]): Unit = {
     val dt = args(0)
+    val out_dt = args(1)
     val selectSQL = s"select id, words from ${srcTable} where stat_date=${dt}"
     val docDF = sparkEnv.hiveContext.sql(selectSQL)
 
@@ -35,7 +36,7 @@ object CreateDocVec {
     println(word2vecMap.size)
     word2vecMap.foreach(r=>println(r._1))
 
-    val docVecRDD = docDF.map(r => {
+    val docVecRDD = docDF.repartition(200).map(r => {
       val id = r.getAs[String](0)
       val words = r.getAs[String](1).split(",").filter(word2vecMap.contains(_))
       (id,words)
@@ -55,6 +56,6 @@ object CreateDocVec {
       import sqlContext.implicits._
       docVecRDD.toDF("id","words","vec")
     }
-    DXPUtils.saveDataFrame(trDF, desTable, dt, sparkEnv.hiveContext)
+    DXPUtils.saveDataFrame(trDF, desTable, out_dt, sparkEnv.hiveContext)
   }
 }
