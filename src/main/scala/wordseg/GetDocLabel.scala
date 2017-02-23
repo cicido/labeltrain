@@ -9,8 +9,8 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 
 object GetDocLabel {
-  val srcTable = "algo.dxp_label_subject_words_new"
-  val desTable = "algo.dxp_label_doc2class"
+  val srcTable = "algo.dxp_label_subject_words"
+  val desTable = "algo.dxp_label_doc2Label"
 
   val sparkEnv = new SparkEnv("GetDocLabel")
 

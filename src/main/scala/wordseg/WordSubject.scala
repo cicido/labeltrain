@@ -12,15 +12,15 @@ import org.apache.spark.sql.SQLContext
 import scala.collection.mutable
 
 object WordSubject {
-  val srcTable = "algo.dxp_label_subject_words_new"
-  val desTable = "algo.dxp_label_subject_words_new"
+  val srcTable = "algo.dxp_label_subject_words"
+  val desTable = "algo.dxp_label_subject_words"
 
   val sparkEnv = new SparkEnv("WordSubject")
 
   def main(args: Array[String]): Unit = {
     val dt = args(0)
-    val thres = args(1).toDouble
-    val outDt = args(2)
+    val outDt = args(1)
+    val thres = args(2).toDouble
     val selectSQL = s"select id, vec from ${srcTable} where " +
       s"stat_date=${dt}"
     val docVecRDD = sparkEnv.hiveContext.sql(selectSQL).map(r => {

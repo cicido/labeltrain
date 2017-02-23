@@ -62,7 +62,7 @@ object TextRank {
       //指定迭代次数及误差阀值
       for(_ <- 0 until max_iter if max_diff >= min_diff){
         val m = new mutable.HashMap[String,Double]()
-        max_diff = 0.0;
+        max_diff = 0.0
         words.foreach(r=>{
           val key = r._1
           val value = r._2

@@ -22,8 +22,10 @@ object CreateDocVec {
 
     val wordsSQL = s"select a.word,a.vecstring from algo.dxp_label_word_vec a " +
       s"join (select word,trval from algo.dxp_label_textrank_words where " +
-      s"stat_date=${dt} order by trval desc limit 100000 ) b on a.word = b.word where " +
-      s"a.stat_date=${dt}"
+      s"stat_date=${dt} order by trval desc limit 300000) b " +
+      s"on a.word = b.word where a.stat_date=${dt}"
+
+    val stopWordsSQL = s""
 
     val word2vecMap = sparkEnv.hiveContext.sql(wordsSQL).map(r => {
       val word = r.getAs[String](0)

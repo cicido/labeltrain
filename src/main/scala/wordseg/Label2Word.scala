@@ -9,7 +9,7 @@ import org.apache.spark.sql.SQLContext
   */
 
 object Label2Word {
-  val srcTable = "algo.dxp_label_subject_words_new"
+  val srcTable = "algo.dxp_label_subject_words"
   val desTable = "algo.dxp_label_label2word"
 
   val sparkEnv = new SparkEnv("Label2Word")
@@ -17,7 +17,8 @@ object Label2Word {
   def main(args: Array[String]): Unit = {
     val dt = args(0)
     val outDt = args(1)
-    val msgSQL = s"select id,words from algo.dxp_label_docvec"
+    val msgSQL = s"select id,words from algo.dxp_label_docvec where " +
+      s"stat_date=${outDt}"
     val idMsgMap = sparkEnv.hiveContext.sql(msgSQL).map(r=>{
       (r.getAs[String](0),r.getAs[String](1))
     }).collectAsMap()
@@ -38,7 +39,9 @@ object Label2Word {
             ""
           }
         }
-      }).mkString(",").split(",").toSet.mkString(",")
+      }).mkString(",").split(",").map((_,1)).groupBy(_._1).
+        map(l => (l._1, l._2.map(_._2).reduce(_+_))).toArray.
+        sortWith(_._2>_._2).map(x=>x._1+"|"+x._2).mkString(",")
       (ids,words)
     })
 
