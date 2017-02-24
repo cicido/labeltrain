@@ -19,7 +19,6 @@ package wordseg
 
 import common.DXPUtils
 import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 
 import scala.collection.mutable
@@ -28,12 +27,13 @@ object TextRank {
   val srcTable = "algo.dxp_label_word_seg"
   val desTable = "algo.dxp_label_textrank_words"
 
+  val midTable = "algo.dxp_label_textrank_mid"
   val sparkEnv = new SparkEnv("TextRank")
 
   def main(args: Array[String]): Unit = {
     val dt = args(0)
     val out_dt = args(1)
-    val selectSQL = s"select words from ${srcTable} where stat_date=${dt}"
+    val selectSQL = s"select words,id,msg from ${srcTable} where stat_date=${dt}"
     val wordsDF = sparkEnv.hiveContext.sql(selectSQL)
 
     val max_iter = 20
@@ -41,8 +41,8 @@ object TextRank {
     val window = 5
     val d = 0.85
 
-    //对每篇文章进行TextRank计算，最后进行相同项合并
-    val trRDD:RDD[(String,Double)] = wordsDF.repartition(200).map(l=>{
+    //对每篇文章进行TextRank计算
+    val trRDD = wordsDF.repartition(200).map(l=>{
       val wordsArr = l.getAs[String](0).split(",")
       val words = new mutable.HashMap[String,Set[String]]()
       //取得每个词在指定窗口下词集合
@@ -59,7 +59,7 @@ object TextRank {
       var score = new mutable.HashMap[String,Double]()
       var max_diff = 1.0
 
-      //指定迭代次数及误差阀值
+      // 指定迭代次数及误差阀值
       for(_ <- 0 until max_iter if max_diff >= min_diff){
         val m = new mutable.HashMap[String,Double]()
         max_diff = 0.0
@@ -83,14 +83,34 @@ object TextRank {
         })
         score = m
       }
-      score.toArray.sortWith(_._2 > _._2).take((score.size*0.8).toInt)
-    }).flatMap(r=>r)
+      // 保留排名靠前的80%的词
+      //score.toArray.sortWith(_._2 > _._2).take((score.size*0.8).toInt)
+      (score.toArray.sortWith(_._2>_._2),l.getAs[String](1),l.getAs[String](2))
+    })//.flatMap(r=>r)
 
+    trRDD.cache()
+
+    // 保留排序后结果，以便检查TextRank排序结果
+    val midRDD = {
+      val sc = SparkContext.getOrCreate()
+      val sqlContext = SQLContext.getOrCreate(sc)
+      import sqlContext.implicits._
+      trRDD.map(r=>{
+        (r._2,r._3,r._1.mkString(","))
+      }).toDF("id","msg","textrank")
+    }
+    DXPUtils.saveDataFrame(midRDD,midTable,out_dt,sparkEnv.hiveContext)
+
+    // 在同一篇文章中按分数进行排序，并取前80%的词，最后对分数归一化后进行相同词合并
     val trDF = {
       val sc = SparkContext.getOrCreate()
       val sqlContext = SQLContext.getOrCreate(sc)
       import sqlContext.implicits._
-      trRDD.reduceByKey(_ + _).toDF("word","trval")
+      trRDD.flatMap(r=>{
+        val wordsArr = r._1.take((r._1.length*0.8).toInt)
+        val allScore = wordsArr.map(_._2).sum
+        wordsArr.map(w=>(w._1,w._2/allScore))
+      }).reduceByKey(_ + _).toDF("word","trval")
     }
     DXPUtils.saveDataFrame(trDF,desTable,out_dt,sparkEnv.hiveContext)
   }
