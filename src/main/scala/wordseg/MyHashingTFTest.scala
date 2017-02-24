@@ -52,7 +52,7 @@ object MyHashingTFTest {
     // 过滤条件设置
     val stopWordsDF = tfidfDF.filter(tfidfDF("tf")> docNum/10
       or (tfidfDF("tf")< tfidfDF("df")*1.2 and tfidfDF("df") > docNum/20)
-      or tfidfDF("df") > docNum/10)
+      or tfidfDF("df") > docNum/10).select("word")
 
     DXPUtils.saveDataFrameWithType(stopWordsDF,stopWordsTable,dt+"_idf",
       sparkEnv.hiveContext, "string")
