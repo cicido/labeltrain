@@ -13,7 +13,8 @@ object MyHashingTFTest {
   val srcTable = "algo.dxp_label_word_seg"
   val desTable = "algo.dxp_label_tfidf_words"
 
-  val sparkEnv = new SparkEnv("GetImportantWord")
+  val stopWordsTable = "algo.dxp_label_stopwords"
+  val sparkEnv = new SparkEnv("TFIDF")
 
   def main(args: Array[String]): Unit = {
     val dt = args(0)
@@ -42,11 +43,19 @@ object MyHashingTFTest {
 
       val tfidfArr = tfMap.map(r=>{
         (r._1,r._2,idfMap.getOrElse(r._1,0),
-          math.log((docNum + 1.0) / (idfMap.getOrElse(r._1,0) + 1.0)))
+          r._2 * math.log((docNum + 1.0) / (idfMap.getOrElse(r._1,0) + 1.0)))
       })
       sc.parallelize(tfidfArr.toSeq).toDF("word", "tf","df","tfidf")
     }
     DXPUtils.saveDataFrame(tfidfDF,desTable,dt,sparkEnv.hiveContext)
+
+    // 过滤条件设置
+    val stopWordsDF = tfidfDF.filter(tfidfDF("tf")> docNum/10
+      or (tfidfDF("tf")< tfidfDF("df")*1.2 and tfidfDF("df") > docNum/20)
+      or tfidfDF("df") > docNum/10)
+
+    DXPUtils.saveDataFrameWithType(stopWordsDF,stopWordsTable,dt+"_idf",
+      sparkEnv.hiveContext, "string")
 
     /*
     val hashingTF = new MLHashingTF().
