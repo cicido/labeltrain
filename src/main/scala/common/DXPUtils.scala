@@ -11,8 +11,14 @@ import scala.collection.JavaConversions._
   */
 object DXPUtils {
 
+  // 在实际建表时,可能需要灵活的分区类型,如string类型
+  // 增加partition分区类型设置,不改动原有的默信bigint类型
   def saveDataFrame(df: DataFrame, outTable: String, dt: String,
-                    hiveContext: HiveContext): Unit = {
+                    hiveContext: HiveContext): Unit ={
+    saveDataFrameWithType(df,outTable,dt,hiveContext,"bigint")
+  }
+  def saveDataFrameWithType(df: DataFrame, outTable: String, dt: String,
+                    hiveContext: HiveContext, partionType:String): Unit = {
     val cols = df.columns
     val sma = df.schema
     val colsType = cols.map(r => {
@@ -27,7 +33,7 @@ object DXPUtils {
 
     val colsString = cols.zip(colsType).map(r => r._1 + " " + r._2).mkString(",")
     val create_table_sql: String = s"create table if not exists $outTable " +
-      s" ($colsString) partitioned by (stat_date bigint) STORED AS RCFILE"
+      s" ($colsString) partitioned by (stat_date ${partionType}) STORED AS RCFILE"
     println(create_table_sql)
     hiveContext.sql(create_table_sql)
 
