@@ -25,14 +25,16 @@ object CreateDocVec {
       s"stat_date=${dt} order by trval desc limit 300000) b " +
       s"on a.word = b.word where a.stat_date=${dt}"
 
-    val stopWordsSQL = s""
+    val stopWordsSQL = s"select distinct(word) from algo.dxp_label_stopwords"
+    val stopWordsArr = sparkEnv.hiveContext.sql(stopWordsSQL).
+      map(_.getAs[String](0)).collect()
 
     val word2vecMap = sparkEnv.hiveContext.sql(wordsSQL).map(r => {
       val word = r.getAs[String](0)
       val vec = r.getAs[String](1).split(",").map(_.toDouble)
       //val wordVec = Vectors.dense(vec)
       (word, vec)
-    }).collect().toMap
+    }).collect().filterNot(r=>stopWordsArr.contains(r._1)).toMap
 
     println("*\n" * 30)
     println(word2vecMap.size)
@@ -42,7 +44,7 @@ object CreateDocVec {
       val id = r.getAs[String](0)
       val words = r.getAs[String](1).split(",").filter(word2vecMap.contains(_))
       (id,words)
-    }).filter(_._2.length > 2).map(r=>{
+    }).filter(_._2.length > 5).map(r=>{
       val oriDocVec = r._2.map(word2vecMap(_)).reduceLeft((a, b) => {
         a.zip(b).map(r => r._1 + r._2)
       })
