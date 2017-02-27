@@ -28,6 +28,7 @@ object TextRank {
   val desTable = "algo.dxp_label_textrank_words"
 
   val midTable = "algo.dxp_label_textrank_mid"
+  val stopWordTable = "algo.dxp_label_stopwords"
   val sparkEnv = new SparkEnv("TextRank")
 
   def main(args: Array[String]): Unit = {
@@ -101,17 +102,30 @@ object TextRank {
     }
     DXPUtils.saveDataFrame(midRDD,midTable,out_dt,sparkEnv.hiveContext)
 
-    // 在同一篇文章中按分数进行排序，并取前80%的词，最后对分数归一化后进行相同词合并
+    // 在同一篇文章中按分数进行排序，并取前80%的词.
+    // 最后对分数归一化后进行相同词合并
     val trDF = {
       val sc = SparkContext.getOrCreate()
       val sqlContext = SQLContext.getOrCreate(sc)
       import sqlContext.implicits._
       trRDD.flatMap(r=>{
-        val wordsArr = r._1.take((r._1.length*0.8).toInt)
-        val allScore = wordsArr.map(_._2).sum
-        wordsArr.map(w=>(w._1,w._2/allScore))
+        r._1.take((r._1.length*0.8).toInt)
       }).reduceByKey(_ + _).toDF("word","trval")
     }
     DXPUtils.saveDataFrame(trDF,desTable,out_dt,sparkEnv.hiveContext)
+
+    val stopWordsDF = {
+      val sc = SparkContext.getOrCreate()
+      val sqlContext = SQLContext.getOrCreate(sc)
+      import sqlContext.implicits._
+      trRDD.flatMap(r=>{
+        r._1.slice((r._1.length*0.8).toInt, r._1.length).map(w=>{
+          (w._1,1.0)
+        })
+      }).reduceByKey(_ + _).toDF("word","score")
+    }
+    DXPUtils.saveDataFrameWithType(stopWordsDF.filter(stopWordsDF("score")>100),
+      stopWordTable,
+      out_dt+"_tr", sparkEnv.hiveContext, "string")
   }
 }
