@@ -17,13 +17,17 @@ object SegWord {
     val dt = args(0)
     val out_dt = args(1)
     val selectSQL = s"select id,msg from ${srcTable}"
-    //val corpusDF = sparkEnv.hiveContext.sql(selectSQL)
-    //val segDF = segWordInDF(corpusDF, "msg","words")
+    // val corpusDF = sparkEnv.hiveContext.sql(selectSQL)
+    // val segDF = segWordInDF(corpusDF, "msg","words")
+    // 进行规则过滤
+    val selfDefinedStopWords = Array("先生","女士","大爷","小姐","某") ++
+      Array("路","市","区","县")
     val segRDD = sparkEnv.hiveContext.sql(selectSQL).repartition(200).map(r=>{
       val id = r.getAs[String](0)
       val msg = r.getAs[String](1)
       val wordsArr = DXPUtils.segMsgWithNature(msg).filter(r=>{
-        r._2.startsWith("n") && r._1.length > 1
+        r._2.startsWith("n") && r._1.length > 1 &&
+        selfDefinedStopWords.filter(r._1.contains(_)).size == 0
       })
       (id,msg,wordsArr)
     })
