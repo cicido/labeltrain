@@ -45,7 +45,7 @@ object CreateDocVec {
 
     println("*\n" * 30)
     println(word2vecMap.size)
-    word2vecMap.foreach(r=>println(r._1))
+    // word2vecMap.foreach(r=>println(r._1))
 
     val docVecRDD = docDF.repartition(200).map(r => {
       val id = r.getAs[String](0)
