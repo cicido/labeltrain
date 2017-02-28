@@ -17,11 +17,12 @@ object GetDocLabel {
   def main(args: Array[String]): Unit = {
     val dt = args(0)
     val outDt = args(1)
-    val msgSQL = s"select id,msg,words from algo.dxp_label_word_seg"
+    val msgSQL = s"select id,msg,words from algo.dxp_label_word_seg " +
+      s"where stat_date=${outDt}"
     val msgDF = sparkEnv.hiveContext.sql(msgSQL)
 
     val docsSQL = s"select id from ${srcTable} where " +
-      s"stat_date=${dt}"
+      s"stat_date = ${dt}"
     val docsRDD = sparkEnv.hiveContext.sql(docsSQL).repartition(100).map(r => {
       r.getAs[String](0)
     }).zipWithUniqueId().flatMap(r=>{
