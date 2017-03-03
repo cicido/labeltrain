@@ -6,14 +6,13 @@ package wordseg
 
 import common.DXPUtils
 import org.apache.spark.SparkContext
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 
-import scala.collection.mutable
-
-object WordSubject {
-  val srcTable = "algo.dxp_label_docvec"
-  val desTable = "algo.dxp_label_subject_words"
+object WordSubjectWithBLAS {
+  val srcTable = "algo.dxp_label_docvec_with_blas"
+  val desTable = "algo.dxp_label_subject_words_with_blas"
 
   val sparkEnv = new SparkEnv("WordSubject")
 
@@ -23,12 +22,13 @@ object WordSubject {
     val isFirst = args(2).toInt
     val thres = args(3).toDouble
     val tbName = if(isFirst == 1) srcTable else desTable
-    val selectSQL = s"select id, vec from ${tbName} where " +
+    val selectSQL = s"select id, vec,norm from ${tbName} where " +
       s"stat_date=${dt}"
     val docVecRDD = sparkEnv.hiveContext.sql(selectSQL).map(r => {
       val id = r.getAs[String](0).replaceAll(",", "|")
-      val vec = r.getAs[String](1).split(",").map(r => (r.toDouble * 1000000).toInt / 1000000.0)
-      (id, vec)
+      val vec = Vectors.dense(r.getAs[String](1).split(",").map(_.toDouble))
+      val norm = r.getAs[Double](2)
+      (id, vec, norm)
     })
     docVecRDD.cache()
 
@@ -47,13 +47,15 @@ object WordSubject {
       val sqlContext = SQLContext.getOrCreate(sc)
       import sqlContext.implicits._
       simRDD.map(r => {
-        (r._1, r._2.mkString(","))
-      }).toDF("id", "vec")
+        (r._1, r._2.toArray.mkString(","),r._3)
+      }).toDF("id", "vec", "norm")
     }
     DXPUtils.saveDataFrame(trDF, desTable, outDt, sparkEnv.hiveContext)
   }
 
-  def cosineSim(docVecRDD: RDD[(String, Array[Double])], thres:Double): RDD[(String,Array[Double])] = {
+
+  def cosineSim(docVecRDD: RDD[(String,Vector,Double)], thres:Double):
+  RDD[(String,Vector,Double)] = {
     val docVecArr = docVecRDD.collect().sortWith(_._1 < _._1)
     println("*\n" * 50)
     println(docVecArr.length)
@@ -65,11 +67,15 @@ object WordSubject {
       var flag = true
       var res = r
       var i = 0
-      while (flag && i < docArr.length){
+      var maxsim = 0.0
+      while (i < docArr.length){
         val w = docArr(i)
-        val sim = (0 until r._2.length).map(x => w._2(x) * r._2(x)).sum
+        val sim = MYBLAS.dot(r._2,w._2) / (r._3 * w._3)
         if(sim > thres){
-          res = w
+          if(sim > maxsim){
+            res = w
+            maxsim = sim
+          }
           flag = false
         }
         i += 1
@@ -77,10 +83,11 @@ object WordSubject {
       if(flag) Array(r)
       else {
         val mid = id + "," + res._1
-        val tmpvec = (0 until r._2.length).map(x => r._2(x) + res._2(x))
-        val sum = math.sqrt(tmpvec.map(x => x * x).sum)
-        val mvec = tmpvec.map(w => (w * 1000000 / sum).toInt / 1000000.0).toArray
-        Array(r, (mid, mvec))
+        val mvec = Vectors.zeros(Config.vectorSize)
+        MYBLAS.copy(r._2,mvec)
+        MYBLAS.axpy(1.0,res._2,mvec)
+        val norm = math.sqrt(MYBLAS.dot(mvec,mvec))
+        Array(r, (mid, mvec,norm))
       }
     })
 
@@ -90,7 +97,7 @@ object WordSubject {
       r.split(",")
     })
 
-    val docMap = new mutable.HashMap[String,Int]()
+    val docMap = new scala.collection.mutable.HashMap[String,Int]()
 
     val fArr = filtedArr.filter(r=>{
       if(docMap.contains(r(0)) || docMap.contains(r(1))){
@@ -112,7 +119,7 @@ object WordSubject {
       mergeArr.contains(r._1) ||
         (r._1.split(",").length == 1 && (!deleteSingDocArr.contains(r._1)))
     }).map(r=>{
-      (r._1.replaceAll(",","|"),r._2)
+      (r._1.replaceAll(",","|"),r._2,r._3)
     })
   }
 }

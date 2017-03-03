@@ -9,7 +9,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 
 object GetDocLabel {
-  val srcTable = "algo.dxp_label_subject_words"
+  val srcTable = "algo.dxp_label_subject_words_with_blas"
   val desTable = "algo.dxp_label_doc2Label"
 
   val sparkEnv = new SparkEnv("GetDocLabel")
@@ -18,7 +18,7 @@ object GetDocLabel {
     val dt = args(0)
     val outDt = args(1)
     val msgSQL = s"select id,msg,words from algo.dxp_label_word_seg " +
-      s"where stat_date=${outDt}"
+      s"where stat_date= ${outDt}"
     val msgDF = sparkEnv.hiveContext.sql(msgSQL)
 
     val docsSQL = s"select id from ${srcTable} where " +

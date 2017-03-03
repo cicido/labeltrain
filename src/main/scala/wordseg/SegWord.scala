@@ -20,20 +20,33 @@ object SegWord {
     // val corpusDF = sparkEnv.hiveContext.sql(selectSQL)
     // val segDF = segWordInDF(corpusDF, "msg","words")
     // 进行规则过滤
-    val selfDefinedStopWords = Array("先生","女士","大爷","小姐","某") ++
-      Array("路","市","区","县")
+    val nrStopWords = Array("先生","女士","大爷","小姐","某")
+    val nsStopWords = Array("路","市","区","县","省","镇","村","乡")
+
+    // 停用词过滤
+    val stopSQL = "select distinct(word) from algo.dxp_label_stopwords"
+    val stopArr = sparkEnv.hiveContext.sql(stopSQL).map(_.getAs[String](0)).collect()
+
     val segRDD = sparkEnv.hiveContext.sql(selectSQL).repartition(200).map(r=>{
       val id = r.getAs[String](0)
       val msg = r.getAs[String](1)
       val wordsArr = DXPUtils.segMsgWithNature(msg).filter(r=>{
-        r._2.startsWith("n") && r._1.length > 1 &&
-        selfDefinedStopWords.filter(r._1.contains(_)).size == 0
+        r._2.startsWith("n") && r._1.length > 1 && ((
+          !r._2.startsWith("nx") &&
+          nrStopWords.filter(r._1.contains(_)).size == 0 &&
+          nsStopWords.filter(r._1.endsWith(_)).size == 0 ) ||
+          (r._2.startsWith("nx") &&
+            r._1.
+              filterNot(""" ´~!\\\"″”#$&'()*+`./:;<>?@^[]{}_-|%,\\\\""".contains(_)).
+              size > 1))
+      }).filter(r=>{
+        !stopArr.contains(r._1)
       })
       (id,msg,wordsArr)
     })
     segRDD.cache()
 
-    // 保留词与词性,以用于后续过滤,名词中有人名,地名,机构名及其他实体.
+    // 保留词,词性及出现次数,以用于后续过滤,名词中有人名,地名,机构名及其他实体.
     // 地名与人名有大部分要过滤
     val wordDF = {
       val sc = SparkContext.getOrCreate()
@@ -41,13 +54,13 @@ object SegWord {
       import sqlContext.implicits._
       segRDD.flatMap(r=>{
         r._3.map(w=>{
-          (w._1,Set(w._2))
+          ((w._1,w._2),1)
         })
-      }).reduceByKey(_ ++ _).
+      }).reduceByKey(_ + _).
         map(r=>{
-          (r._1,r._2.mkString(","))
+          (r._1._1,r._1._2,r._2)
         }).
-        toDF("word", "nature")
+        toDF("word", "nature","cnt")
     }
     DXPUtils.saveDataFrame(wordDF,wordNatureTable,out_dt,sparkEnv.hiveContext)
 
@@ -65,15 +78,4 @@ object SegWord {
     }
     DXPUtils.saveDataFrame(segDF,dstTable,out_dt,sparkEnv.hiveContext)
   }
-
-  /*
-  def segWordInDF(df:DataFrame,col:String,newCol:String):DataFrame = {
-    val stringToString = udf[String,String]{w=>
-      DXPUtils.segMsgWithNature(w).filter(r=>{
-        r._2.startsWith("n") && r._1.length > 1
-      }).map(_._1).mkString(",")
-    }
-    df.repartition(200).withColumn(newCol, stringToString(df(col)))
-  }
-  */
 }

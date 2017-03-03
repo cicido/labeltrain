@@ -50,14 +50,17 @@ object MyHashingTFTest {
     DXPUtils.saveDataFrame(tfidfDF,desTable,dt,sparkEnv.hiveContext)
 
     // 过滤条件设置
+    /*
     val stopWordsDF = tfidfDF.filter(tfidfDF("tf")> docNum/10
       or (tfidfDF("tf")< tfidfDF("df")*1.2 and tfidfDF("df") > docNum/100)
       or tfidfDF("df") > docNum/20).
       withColumnRenamed("tfidf","score").
       select("word","score")
+    */
+    val stopWordsDF = tfidfDF.filter(tfidfDF("df")> docNum/10).
+      select("word")
 
-    DXPUtils.saveDataFrameWithType(stopWordsDF,stopWordsTable,dt+"_idf",
-      sparkEnv.hiveContext, "string")
+    DXPUtils.saveDataFrame(stopWordsDF,stopWordsTable,dt+"01",sparkEnv.hiveContext)
 
     /*
     val hashingTF = new MLHashingTF().
