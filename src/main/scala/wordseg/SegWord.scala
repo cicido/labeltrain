@@ -28,6 +28,7 @@ object SegWord {
     val segRDD = sparkEnv.hiveContext.sql(selectSQL).repartition(200).map(r=>{
       val id = r.getAs[String](0)
       val msg = r.getAs[String](1)
+
       val wordsArr = SegWordUtils.segMsgWithNature(msg).filter(w=> {
         w._2.startsWith("n") && w._1.length > 1
       }).filterNot(w=>{(
