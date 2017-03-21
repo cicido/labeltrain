@@ -1,6 +1,6 @@
 package wordseg
 
-import common.DXPUtils
+import common.{DXPUtils, SegWordUtils}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
 
@@ -20,8 +20,6 @@ object SegWord {
     // val corpusDF = sparkEnv.hiveContext.sql(selectSQL)
     // val segDF = segWordInDF(corpusDF, "msg","words")
     // 进行规则过滤
-    val nrStopWords = Array("先生","女士","大爷","小姐","某")
-    val nsStopWords = Array("路","市","区","县","省","镇","村","乡")
 
     // 停用词过滤
     val stopSQL = "select distinct(word) from algo.dxp_label_stopwords"
@@ -30,17 +28,21 @@ object SegWord {
     val segRDD = sparkEnv.hiveContext.sql(selectSQL).repartition(200).map(r=>{
       val id = r.getAs[String](0)
       val msg = r.getAs[String](1)
-      val wordsArr = DXPUtils.segMsgWithNature(msg).filter(r=>{
-        r._2.startsWith("n") && r._1.length > 1 && ((
-          !r._2.startsWith("nx") &&
-          nrStopWords.filter(r._1.contains(_)).size == 0 &&
-          nsStopWords.filter(r._1.endsWith(_)).size == 0 ) ||
-          (r._2.startsWith("nx") &&
-            r._1.
+      val wordsArr = SegWordUtils.segMsgWithNature(msg).filter(w=> {
+        w._2.startsWith("n") && w._1.length > 1
+      }).filterNot(w=>{(
+          w._2.startsWith("nr") &&
+            (Config.nrPrefix.filter(w._1.startsWith(_)).size != 0 ||
+          Config.nrSuffix.filter(w._1.endsWith(_)).size != 0) ) ||
+          (w._2.startsWith("nx") &&
+            w._1.
               filterNot(""" ´~!\\\"″”#$&'()*+`./:;<>?@^[]{}_-|%,\\\\""".contains(_)).
-              size > 1))
-      }).filter(r=>{
-        !stopArr.contains(r._1)
+              size < 2) || (
+          w._1.startsWith("ns") && Config.nsStopWords.filter(w._1.endsWith(_)).size != 0
+        )
+      }).filter(w=>{
+        !stopArr.contains(w._1) && !Config.nrStopWords.contains(w._1) &&
+        !Config.otherStopWords.contains(w._1)
       })
       (id,msg,wordsArr)
     })
