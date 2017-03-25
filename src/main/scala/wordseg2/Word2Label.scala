@@ -1,4 +1,4 @@
-package wordseg
+package wordseg2
 
 import common.DXPUtils
 import org.apache.spark.SparkContext
@@ -24,7 +24,7 @@ object Word2Label {
     val docsRDD = sparkEnv.hiveContext.sql(docsSQL).repartition(200).flatMap(r => {
       val classid = r.getAs[Long](0)
       r.getAs[String](1).split(",").map(w=>{
-        val word2Count = w.split(";")
+        val word2Count = w.split("\\|")
         (word2Count(0),Array((classid,word2Count(1).toInt)))
       })
     }).reduceByKey(_ ++ _)
@@ -35,7 +35,7 @@ object Word2Label {
       import sqlContext.implicits._
       docsRDD.map(r=>{
         val wordCountStr = r._2.sortWith(_._2 >_._2).map(w=>{
-          w._1 + ";" + w._2
+          w._1 + "|" + w._2
         }).mkString(",")
         (r._1,wordCountStr)
       }).toDF("words","classids")

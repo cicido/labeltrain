@@ -1,4 +1,4 @@
-package wordseg
+package wordseg2
 
 import common.{DXPUtils, SegWordUtils}
 import org.apache.spark.SparkContext
@@ -6,7 +6,6 @@ import org.apache.spark.sql.SQLContext
 
 /**
   * Created by duanxiping on 2017/2/6.
-  * 只做停用词过滤，及基本的规则过滤
   */
 object SegWord {
   val srcTable = "algo.dxp_label_corpus"
@@ -36,9 +35,9 @@ object SegWord {
       val msg = r.getAs[String](1)
 
       val wordsArr = SegWordUtils.segMsgWithNature(msg).filter(w=> {
-        w._2.startsWith("n") && w._1.length > 1 /*&&
-        !w._2.startsWith("ns") && !w._2.startsWith("nr")*/
-      }).filterNot(w=>{(
+        w._2.startsWith("n") && w._1.length > 1 &&
+        !w._2.startsWith("ns") && !w._2.startsWith("nr")
+      })/*.filterNot(w=>{(
           nrPrefix.filter(w._1.startsWith(_)).length != 0 ||
           nrSuffix.filter(w._1.endsWith(_)).length != 0 ) ||
           (w._2.startsWith("nx") &&
@@ -47,7 +46,7 @@ object SegWord {
               size < 2) || (
           nsStopWords.filter(w._1.endsWith(_)).length != 0
         )
-      }).filter(w=>{
+      })*/.filter(w=>{
         !stopArr.contains(w._1) && !nrStopWords.contains(w._1) &&
         !otherStopWords.contains(w._1)
       })
