@@ -1,8 +1,8 @@
-package wordseg
+package wordseg2
 
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.hive.HiveContext
-import org.apache.spark.{SparkConf, SparkContext}
 
 /**
   * Created by duanxiping on 2017/2/6.

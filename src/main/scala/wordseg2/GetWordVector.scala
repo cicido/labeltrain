@@ -1,4 +1,4 @@
-package wordseg
+package wordseg2
 
 import common.DXPUtils
 import org.apache.spark.mllib.linalg.{Vector, Vectors}

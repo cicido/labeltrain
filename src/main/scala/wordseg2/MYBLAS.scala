@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package wordseg
+package wordseg2
 
 import com.github.fommil.netlib.BLAS.{getInstance => NativeBLAS}
 import com.github.fommil.netlib.{F2jBLAS, BLAS => NetlibBLAS}
