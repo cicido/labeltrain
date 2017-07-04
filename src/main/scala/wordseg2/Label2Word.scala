@@ -42,7 +42,9 @@ object Label2Word {
       s"stat_date=${dt}"
 
     val brIdWordsMap = sparkEnv.sc.broadcast(idMsgMap)
-    val docsRDD = sparkEnv.hiveContext.sql(docsSQL).repartition(200).map(r => {
+    val docsRDD = sparkEnv.hiveContext.sql(docsSQL).repartition(200).rdd.filter(r=>{
+      r.getAs[String](0).split("\\|").length > 0
+    }).map(r => {
       val ids = r.getAs[String](0)
       val words = ids.split("\\|").map(d => {
         val idWordsMap = brIdWordsMap.value

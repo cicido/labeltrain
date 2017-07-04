@@ -3,13 +3,39 @@ package common
 import com.hankcs.hanlp.HanLP
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.hive.HiveContext
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.types.{StructType, _}
+
 import scala.collection.JavaConversions._
 
 /**
   * Created by duanxiping on 2017/2/5.
   */
 object DXPUtils {
+
+  /*
+  根据字段与类型串生成对应的Schema,以用RDD->DataFrame的转换
+   */
+  def createSchema(arr:Array[(String,String)]):StructType = {
+    val st = arr.map(r=>{
+      r._2.toLowerCase match {
+        case "string" => StructField(r._1, StringType, nullable = true)
+        case "int" => StructField(r._1, IntegerType, nullable = true)
+        case "long" | "bigint" => StructField(r._1, LongType, nullable = true)
+        case "boolean" | "bool" => StructField(r._1, BooleanType, nullable = true)
+        case "double" => StructField(r._1, DoubleType, nullable = true)
+      }
+    })
+    StructType(st)
+  }
+
+  /*
+  生成全部为string类型的Schema
+   */
+  def createStringSchema(arr:Array[String]):StructType = {
+    val newArr: Array[(String,String)] = arr.map((_,"string"))
+    createSchema(newArr)
+  }
+
 
   // 在实际建表时,可能需要灵活的分区类型,如string类型
   // 增加partition分区类型设置,不改动原有的默信bigint类型

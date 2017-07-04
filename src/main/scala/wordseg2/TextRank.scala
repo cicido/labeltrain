@@ -71,7 +71,7 @@ object TextRank {
           value.foreach(other=>{
             val size = words.get(other).size
             if( key != other && size > 0){
-              val initVal = if(score.contains(key)) score(key)
+              val initVal = if(score.contains(other)) score(other)
                   else 0
               m.put(key,m(key)+ d/size * initVal)
             }
