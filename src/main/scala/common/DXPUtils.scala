@@ -66,21 +66,42 @@ object DXPUtils {
     val tmptable = "dxp_tmp_table"
     df.registerTempTable(tmptable)
 
-    val insert_sql: String = s"insert overwrite table $outTable partition(stat_date = $dt) " +
+    val outdt = if(partionType == "string") "\"" + dt +"\"" else dt
+
+    val insert_sql: String = s"insert overwrite table $outTable partition(stat_date = $outdt) " +
       s"select * from $tmptable"
     hiveContext.sql(insert_sql)
     hiveContext.dropTempTable(tmptable)
   }
 
+  // 增加全半角转换及繁简体转换
   def segMsg(msg: String): Array[String] = {
-    HanLP.segment(msg).map(r => {
+    val simpleMsg= HanLP.convertToSimplifiedChinese(toSBC(msg))
+    HanLP.segment(simpleMsg).map(r => {
       r.word
     }).toArray
   }
 
   def segMsgWithNature(msg: String): Array[(String, String)] = {
-    HanLP.segment(msg).map(r => {
+    val simpleMsg= HanLP.convertToSimplifiedChinese(toSBC(msg))
+    HanLP.segment(simpleMsg).map(r => {
       (r.word, r.nature.toString)
     }).toArray
+  }
+
+  def toSBC(input: String): String = {
+    val c: Array[Char] = input.toCharArray
+    val d = c.map(r => {
+      if (r == '\u3000') ' '
+      else if (r < '\uFF5F' && r > '\uFF00') {
+        (r - 65248).toChar
+      }
+      else r
+    })
+    new String(d)
+  }
+
+  def main(args: Array[String]): Unit = {
+    println(toSBC("ＮＩＡＥＰＮＩＡＥＰ"))
   }
 }
